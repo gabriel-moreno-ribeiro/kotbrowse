@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>kotbrowse demo</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .swatches div { display: inline-block; width: 40px; height: 20px; }
+  </style>
+</head>
+<body>
+  <header><h1>kotbrowse</h1></header>
+  <main>
+    <h2>A browser engine in Kotlin</h2>
+    <p>This page is rendered by <b>kotbrowse</b>, which parses the HTML, applies the
+       <em>cascading</em> stylesheets, lays out block and inline boxes and paints the
+       result to a PNG. <a href="https://example.com">Links</a> are blue and underlined.</p>
+    <div class="note">Notes get a coloured left border, padding and a background.</div>
+    <h2>Lists</h2>
+    <ul>
+      <li>Unordered items get bullets</li>
+      <li>Words wrap when a line is full, so this item is long enough to need more than one line of text</li>
+    </ul>
+    <ol>
+      <li>Ordered lists</li>
+      <li>are numbered</li>
+    </ol>
+    <h2>Preformatted text</h2>
+<pre>fun main() {
+    println("hello from kotbrowse")
+}</pre>
+    <p>Inline <code>code</code> keeps its background, and entities like &amp;, &lt; and &copy; are decoded.</p>
+  </main>
+  <footer>Rendered without a real browser.</footer>
+</body>
+</html>
