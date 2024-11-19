@@ -1,70 +1,30 @@
 # kotbrowse
 
-A small web browser engine written from scratch in Kotlin. It fetches a
-page over HTTP, parses the HTML into a DOM, parses the CSS (author
-stylesheets, `<style>` blocks, inline styles and a built-in user agent
-sheet), runs the cascade with specificity and inheritance, lays the page
-out with block and inline formatting, and paints the result to a PNG.
-No libraries beyond the JDK.
+Um motor de navegador pequeno em Kotlin. Ele busca a página por HTTP, parseia o HTML numa DOM, parseia o CSS (folhas do autor, `<style>`, `style=""` e uma folha de user agent embutida), roda a cascata com especificidade e herança, faz o layout com formatação de bloco e inline e pinta o resultado num PNG. Só o JDK.
+
+Não renderiza o Facebook. Renderiza páginas normais de texto, com títulos, listas, `pre`, links, imagens e a folha de estilo linkada, e isso já é o suficiente pra entender de verdade o que o Chrome faz quando você aperta Enter.
 
 ```sh
-sh build.sh                                   # needs kotlinc and a JDK 17+
+sh build.sh                                   # kotlinc + JDK 17+
 java -jar build/kotbrowse.jar https://example.com -o page.png
 java -jar build/kotbrowse.jar examples/index.html --dump --text
 ```
 
-Options: `-o file.png` output, `-w 800` viewport width, `--dump` prints the
-layout tree, `--text` prints the page as text.
+`-o` arquivo de saída, `-w 800` largura, `--dump` imprime a árvore de layout, `--text` imprime a página como texto.
 
-## Pipeline
+## O pipeline
 
-1. **Fetch** (`Net.kt`): `http(s):` and `file:` URLs, redirects, charset
-   detection from the header or `<meta charset>`. Stylesheets linked with
-   `<link rel=stylesheet>` and images are fetched relative to the page URL.
-2. **HTML** (`Html.kt`): a forgiving tokenizer and tree builder. Handles
-   attributes with or without quotes, comments, doctype, entities
-   (`&amp;`, `&#65;`, `&#x41;`, common named ones), void elements, raw
-   `<script>`/`<style>` content, and implicit end tags: a block closes an
-   open `<p>`, `<li>` closes the previous `<li>`, and so on. Missing
-   `html`/`body` elements are created like a real browser does.
-3. **CSS** (`Css.kt`): selectors with type, `#id`, `.class`, `[attr]`,
-   `[attr=value]`, `*`, descendant and child combinators (selectors with
-   unsupported parts such as `:hover` never match), specificity,
-   `!important`, comments, `@media` blocks and shorthand expansion for
-   `margin`, `padding`, `border`, `border-*`, `background`, `font` and
-   `list-style`. Colours: named, `#rgb`, `#rrggbb(aa)`, `rgb()`, `rgba()`.
-   Lengths: `px`, `em`, `rem`, `%`, `pt` and friends.
-4. **Style** (`Style.kt`): the cascade sorts matching declarations by
-   importance, origin (user agent, author, inline), specificity and order,
-   then computes values: inherited properties (colour, font, text-align,
-   white-space, text-decoration, list style) flow from the parent, relative
-   font sizes resolve against the parent, borders are zero unless a style is
-   set. Presentational attributes such as `width=` and `bgcolor=` and the
-   `hidden` attribute are honoured too.
-5. **Layout** (`Layout.kt`): the styled tree becomes a box tree of block,
-   inline, anonymous, text and image boxes. Block layout computes widths
-   (auto, fixed, percentages, `max-width`, centring with `margin: auto`),
-   stacks children vertically and collapses adjacent vertical margins.
-   Inline layout collapses whitespace, breaks lines greedily, honours
-   `<br>`, `white-space: pre`, `text-align`, images as atomic inlines, and
-   sizes lines from the tallest font on them. Text measurement is an
-   interface so the layout can be tested with fixed metrics.
-6. **Paint** (`Paint.kt`): the box tree is flattened into a display list
-   (backgrounds, borders, list markers, text, images) which is rasterised
-   with Java2D into a PNG.
+1. **Fetch** (`Net.kt`): `http(s):` e `file:`, redirects, charset do header ou do `<meta charset>`. Folhas linkadas e imagens são buscadas relativas à URL da página.
+2. **HTML** (`Html.kt`): tokenizer e construtor de árvore tolerantes. Atributos com ou sem aspas, comentários, doctype, entidades, elementos void, texto cru de `<script>`/`<style>` e os fechamentos implícitos: bloco fecha `<p>` aberto, `<li>` fecha o `<li>` anterior, etc. `html`/`body` faltando são criados, como um navegador de verdade.
+3. **CSS** (`Css.kt`): seletores de tipo, `#id`, `.classe`, `[attr]`, `[attr=valor]`, `*`, descendente e filho (seletor com coisa que eu não implementei, tipo `:hover`, nunca casa), especificidade, `!important`, comentários, `@media` simples e expansão de shorthand de `margin`, `padding`, `border`, `background`, `font` e `list-style`. Cores nomeadas, hex, `rgb()`, `rgba()`; comprimentos em `px`, `em`, `rem`, `%`, `pt`.
+4. **Estilo** (`Style.kt`): a cascata ordena as declarações por importância, origem (UA, autor, inline), especificidade e ordem, depois computa: propriedades herdadas descem do pai, tamanho de fonte relativo resolve contra o pai, borda é zero sem `border-style`.
+5. **Layout** (`Layout.kt`): a árvore estilizada vira caixas de bloco, inline, anônimas, texto e imagem. Bloco calcula largura (auto, fixa, `%`, `max-width`, centralização com `margin: auto`), empilha filhos e colapsa margens verticais. Inline colapsa espaço, quebra linha, respeita `<br>`, `white-space: pre`, `text-align`, imagens como inline atômico. A medição de texto é uma interface, então o layout roda nos testes com métrica fixa.
+6. **Pintura** (`Paint.kt`): display list (fundos, bordas, marcadores de lista, texto, imagens) rasterizada com Java2D.
 
-## Tests
+A coisa que mais deu trabalho, de longe, foi o fechamento implícito de tags. HTML "válido" quase não existe na internet e o parser tem que ser gentil com tudo.
 
-`sh test.sh` runs the suite: HTML parsing edge cases, selector matching
-and specificity, shorthand expansion, colour and length parsing,
-inheritance and cascade order, dozens of layout geometry checks with
-deterministic font metrics, pixel checks on rendered output, and an
-end-to-end test that starts a local HTTP server and loads a page through
-a redirect with a linked stylesheet, an image and a missing image.
+Testes: `sh test.sh` (parser de HTML com casos de borda, matching e especificidade de seletor, shorthands, cores e comprimentos, herança e ordem da cascata, dezenas de checagens de geometria de layout com métrica determinística, pixels da imagem renderizada, e um teste de ponta a ponta que sobe um servidor HTTP local e carrega uma página passando por redirect, com folha linkada, uma imagem e uma imagem quebrada). O CI renderiza a página de `examples/` e sobe o PNG como artefato.
 
-The `examples/` page exercises most of the engine; CI renders it and
-uploads the PNG as an artifact.
+---
 
-## License
-
-MIT
+**EN:** a small browser engine in Kotlin (JDK only): HTTP fetching, a forgiving HTML parser with implicit end tags, a CSS parser with selectors/specificity/shorthands, the cascade with inheritance, block and inline layout with margin collapsing and line breaking, and Java2D painting to PNG. 147 tests including an end-to-end load through a local HTTP server. MIT.
