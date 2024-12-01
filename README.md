@@ -1,5 +1,7 @@
 # kotbrowse
 
+> 🇺🇸 [English version below](#english)
+
 Um motor de navegador pequeno em Kotlin. Ele busca a página por HTTP, parseia o HTML numa DOM, parseia o CSS (folhas do autor, `<style>`, `style=""` e uma folha de user agent embutida), roda a cascata com especificidade e herança, faz o layout com formatação de bloco e inline e pinta o resultado num PNG. Só o JDK.
 
 Não renderiza o Facebook. Renderiza páginas normais de texto, com títulos, listas, `pre`, links, imagens e a folha de estilo linkada, e isso já é o suficiente pra entender de verdade o que o Chrome faz quando você aperta Enter.
@@ -27,4 +29,31 @@ Testes: `sh test.sh` (parser de HTML com casos de borda, matching e especificida
 
 ---
 
-**EN:** a small browser engine in Kotlin (JDK only): HTTP fetching, a forgiving HTML parser with implicit end tags, a CSS parser with selectors/specificity/shorthands, the cascade with inheritance, block and inline layout with margin collapsing and line breaking, and Java2D painting to PNG. 147 tests including an end-to-end load through a local HTTP server. MIT.
+## English
+
+A small browser engine in Kotlin. It fetches the page over HTTP, parses the HTML into a DOM, parses the CSS (author sheets, `<style>`, `style=""` and a built-in user agent sheet), runs the cascade with specificity and inheritance, does the layout with block and inline formatting and paints the result to a PNG. JDK only.
+
+It doesn't render Facebook. It renders normal text pages, with headings, lists, `pre`, links, images and the linked stylesheet, and that's already enough to really understand what Chrome does when you hit Enter.
+
+```sh
+sh build.sh                                   # kotlinc + JDK 17+
+java -jar build/kotbrowse.jar https://example.com -o page.png
+java -jar build/kotbrowse.jar examples/index.html --dump --text
+```
+
+`-o` output file, `-w 800` width, `--dump` prints the layout tree, `--text` prints the page as text.
+
+## The pipeline
+
+1. **Fetch** (`Net.kt`): `http(s):` and `file:`, redirects, charset from the header or from `<meta charset>`. Linked sheets and images are fetched relative to the page URL.
+2. **HTML** (`Html.kt`): forgiving tokenizer and tree builder. Attributes with or without quotes, comments, doctype, entities, void elements, raw text of `<script>`/`<style>` and the implicit closings: a block closes an open `<p>`, `<li>` closes the previous `<li>`, etc. Missing `html`/`body` are created, like a real browser.
+3. **CSS** (`Css.kt`): type selectors, `#id`, `.class`, `[attr]`, `[attr=value]`, `*`, descendant and child (a selector with something I didn't implement, like `:hover`, never matches), specificity, `!important`, comments, simple `@media` and shorthand expansion of `margin`, `padding`, `border`, `background`, `font` and `list-style`. Named colors, hex, `rgb()`, `rgba()`; lengths in `px`, `em`, `rem`, `%`, `pt`.
+4. **Style** (`Style.kt`): the cascade sorts the declarations by importance, origin (UA, author, inline), specificity and order, then computes: inherited properties come down from the parent, relative font size resolves against the parent, border is zero without `border-style`.
+5. **Layout** (`Layout.kt`): the styled tree becomes block, inline, anonymous, text and image boxes. Block computes width (auto, fixed, `%`, `max-width`, centering with `margin: auto`), stacks children and collapses vertical margins. Inline collapses whitespace, breaks lines, respects `<br>`, `white-space: pre`, `text-align`, images as atomic inlines. Text measurement is an interface, so the layout runs in the tests with fixed metrics.
+6. **Paint** (`Paint.kt`): a display list (backgrounds, borders, list markers, text, images) rasterized with Java2D.
+
+The thing that gave the most work, by far, was the implicit closing of tags. "Valid" HTML barely exists on the internet and the parser has to be gentle with everything.
+
+Tests: `sh test.sh` (HTML parser with edge cases, selector matching and specificity, shorthands, colors and lengths, inheritance and cascade order, dozens of layout geometry checks with deterministic metrics, pixels of the rendered image, and an end-to-end test that brings up a local HTTP server and loads a page through a redirect, with a linked sheet, an image and a broken image). CI renders the page in `examples/` and uploads the PNG as an artifact.
+
+MIT.
